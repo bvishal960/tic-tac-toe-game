@@ -101,8 +101,8 @@ class App {
 
         // Player Move
         this.makeMove(index);
-
-        if (this.game.gameActive) {
+//test
+        if (this.game.gameActive) { 
             if (this.mode === 'single') {
                 this.statusElement.innerText = "AI Thinking...";
                 setTimeout(() => this.aiMove(), 500);
