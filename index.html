@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tic Tac Toe Premium</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="dark-mode">
+    <div class="app-container">
+        <!-- Header -->
+        <header>
+            <div class="logo">
+                <span class="x-brand">X</span><span class="o-brand">O</span>
+                <h1>Master</h1>
+            </div>
+            <div class="header-actions">
+                <button id="sound-toggle" class="icon-btn" title="Toggle Sound">
+                    <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.85 14,18.71V20.77C18.01,19.86 21,16.28 21,12C21,7.72 18.01,4.14 14,3.23M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16.02C15.5,15.29 16.5,13.77 16.5,12M3,9V15H7L12,20V4L7,9H3Z"/></svg>
+                </button>
+                <button id="theme-toggle" class="icon-btn" title="Toggle Theme">
+                    <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20V4Z"/></svg>
+                </button>
+                <button id="stats-btn" class="icon-btn" title="Statistics">
+                    <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M5,19V8H8V19H5M10,19V3H13V19H10M15,19V12H18V19H15Z"/></svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Compact Controls -->
+        <div class="compact-controls">
+            <div class="control-group">
+                <select id="mode-select">
+                    <option value="single">Single Player</option>
+                    <option value="multi">Two Players</option>
+                </select>
+            </div>
+            <div class="control-group" id="diff-group">
+                <select id="difficulty-select">
+                    <option value="easy">Easy</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="hard">Hard</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Live Scoreboard -->
+        <div class="scoreboard glass">
+            <div class="score-item">
+                <span class="score-label">Player X</span>
+                <span class="score-value" id="score-x">0</span>
+            </div>
+            <div class="score-divider"></div>
+            <div class="score-item">
+                <span class="score-label">Draws</span>
+                <span class="score-value" id="score-draw">0</span>
+            </div>
+            <div class="score-divider"></div>
+            <div class="score-item">
+                <span class="score-label" id="score-o-label">CPU</span>
+                <span class="score-value" id="score-o">0</span>
+            </div>
+        </div>
+
+        <!-- Turn Status -->
+        <div id="status" class="status-indicator">Player X's Turn</div>
+
+        <!-- Game Board -->
+        <div class="board-area">
+            <div class="game-board" id="board">
+                <div class="cell" data-index="0"></div>
+                <div class="cell" data-index="1"></div>
+                <div class="cell" data-index="2"></div>
+                <div class="cell" data-index="3"></div>
+                <div class="cell" data-index="4"></div>
+                <div class="cell" data-index="5"></div>
+                <div class="cell" data-index="6"></div>
+                <div class="cell" data-index="7"></div>
+                <div class="cell" data-index="8"></div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-grid">
+            <button id="restart-btn" class="action-btn secondary">Restart</button>
+            <button id="new-game-btn" class="action-btn primary">New Game</button>
+            <button id="reset-stats-btn" class="action-btn danger">Reset Stats</button>
+        </div>
+
+        <!-- Stats Modal -->
+        <div id="stats-modal" class="modal">
+            <div class="modal-content glass">
+                <div class="modal-header">
+                    <h2>Advanced Stats</h2>
+                    <button class="close-modal">&times;</button>
+                </div>
+                <div class="stats-overview">
+                    <div class="stat-box">
+                        <span class="val" id="total-matches">0</span>
+                        <span class="lbl">Matches</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="val" id="win-rate">0%</span>
+                        <span class="lbl">Win Rate</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="val" id="best-streak">0</span>
+                        <span class="lbl">Best Streak</span>
+                    </div>
+                </div>
+                <div class="difficulty-stats">
+                    <h3>AI Difficulty Performance</h3>
+                    <div id="diff-stats-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Result Overlay -->
+        <div id="result-overlay" class="overlay">
+            <div class="result-card glass">
+                <h2 id="result-text">Player X Wins!</h2>
+                <button id="play-again-btn" class="action-btn primary">Play Again</button>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="main.js"></script>
+</body>
+</html>
