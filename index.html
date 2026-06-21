@@ -66,6 +66,13 @@
             </div>
         </div>
 
+        <!-- Room Display -->
+        <div id="room-display" class="glass" style="display:none; padding:10px; margin-bottom:10px; text-align:center;">
+            <p>Room Code: <strong id="display-room-code"></strong></p>
+            <button id="copy-room-btn" class="action-btn secondary">Copy Code</button>
+            <button id="exit-room-btn" class="action-btn danger">Exit Room</button>
+        </div>
+
         <!-- Turn Status -->
         <div id="status" class="status-indicator">Player X's Turn</div>
 
@@ -130,6 +137,33 @@
                     <div class="divider">or</div>
                     <input type="text" id="room-code-input" placeholder="Enter Room Code">
                     <button id="join-room-btn" class="action-btn secondary">Join Room</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Disconnect Modal -->
+        <div id="disconnect-modal" class="modal">
+            <div class="modal-content glass">
+                <div class="modal-header">
+                    <h2>Connection Lost</h2>
+                </div>
+                <p id="disconnect-msg">Opponent has gone offline.</p>
+                <div class="room-actions">
+                    <button id="new-game-disconnected-btn" class="action-btn primary">Start New Game</button>
+                    <button id="home-btn" class="action-btn secondary">Return to Home</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Request Modal -->
+        <div id="request-modal" class="modal">
+            <div class="modal-content glass">
+                <div class="modal-header">
+                    <h2 id="request-text">Request</h2>
+                </div>
+                <div class="room-actions">
+                    <button id="accept-request-btn" class="action-btn primary">Accept</button>
+                    <button id="decline-request-btn" class="action-btn danger">Decline</button>
                 </div>
             </div>
         </div>

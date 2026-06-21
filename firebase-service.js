@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, set, onValue, update, push, child } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getDatabase, ref, set, onValue, update, push, child, onDisconnect, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyC5H_AimveqwjYDy66oMLBxJiuPw79cY_Q",
@@ -22,5 +22,7 @@ export const firebaseService = {
   onValue,
   update,
   push,
-  child
+  child,
+  onDisconnect,
+  serverTimestamp
 };

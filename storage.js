@@ -80,5 +80,18 @@ export const storage = {
 
     saveSetting(key, value) {
         localStorage.setItem(`tictactoe_${key}`, value);
+    },
+
+    saveRoomState(state) {
+        sessionStorage.setItem('tictactoe_room', JSON.stringify(state));
+    },
+
+    getRoomState() {
+        const saved = sessionStorage.getItem('tictactoe_room');
+        return saved ? JSON.parse(saved) : null;
+    },
+
+    clearRoomState() {
+        sessionStorage.removeItem('tictactoe_room');
     }
 };

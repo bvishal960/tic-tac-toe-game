@@ -12,10 +12,25 @@ class App {
         this.audioCtx = null;
         this.roomId = null;
         this.playerSymbol = null;
+        this.opponentId = null;
+        this.disconnectTimer = null;
+        this.pendingRequest = null;
         this.initDOM();
         this.bindEvents();
         this.applySettings();
         this.updateScoreboard();
+
+        // Auto-reconnect check
+        const savedRoom = storage.getRoomState();
+        if (savedRoom) {
+            this.roomId = savedRoom.roomId;
+            this.playerSymbol = savedRoom.playerSymbol;
+            this.mode = 'online';
+            this.updateModeUI();
+            this.displayRoomCode.innerText = this.roomId;
+            this.roomDisplay.style.display = 'block';
+            this.listenToRoom();
+        }
     }
 
     initDOM() {
@@ -36,9 +51,20 @@ class App {
         this.statsBtn = document.getElementById('stats-btn');
         this.statsModal = document.getElementById('stats-modal');
         this.roomModal = document.getElementById('room-modal');
+        this.requestModal = document.getElementById('request-modal');
+        this.requestText = document.getElementById('request-text');
+        this.acceptRequestBtn = document.getElementById('accept-request-btn');
+        this.declineRequestBtn = document.getElementById('decline-request-btn');
+        this.roomDisplay = document.getElementById('room-display');
+        this.displayRoomCode = document.getElementById('display-room-code');
+        this.copyRoomBtn = document.getElementById('copy-room-btn');
+        this.exitRoomBtn = document.getElementById('exit-room-btn');
         this.roomCodeInput = document.getElementById('room-code-input');
         this.createRoomBtn = document.getElementById('create-room-btn');
         this.joinRoomBtn = document.getElementById('join-room-btn');
+        this.disconnectModal = document.getElementById('disconnect-modal');
+        this.newGameDisconnectedBtn = document.getElementById('new-game-disconnected-btn');
+        this.homeBtn = document.getElementById('home-btn');
         this.closeModal = document.querySelector('.close-modal');
         this.resultOverlay = document.getElementById('result-overlay');
         this.resultText = document.getElementById('result-text');
@@ -62,15 +88,33 @@ class App {
             this.restartGame();
         });
 
-        this.restartBtn.addEventListener('click', () => this.restartGame());
-        this.newGameBtn.addEventListener('click', () => this.restartGame());
-        this.playAgainBtn.addEventListener('click', () => this.restartGame());
+        this.restartBtn.addEventListener('click', () => this.handleAction('restart'));
+        this.newGameBtn.addEventListener('click', () => this.handleAction('newGame'));
+        this.playAgainBtn.addEventListener('click', () => {
+            if (this.mode === 'online') {
+                this.requestRematch();
+            } else {
+                this.restartGame();
+            }
+        });
         this.resetStatsBtn.addEventListener('click', () => this.resetStats());
 
         this.themeToggle.addEventListener('click', () => this.toggleTheme());
         this.soundToggle.addEventListener('click', () => this.toggleSound());
         this.statsBtn.addEventListener('click', () => this.openStats());
         this.closeModal.addEventListener('click', () => this.statsModal.style.display = 'none');
+        this.newGameDisconnectedBtn.addEventListener('click', () => { this.disconnectModal.style.display = 'none'; this.handleAction('newGame'); });
+        this.homeBtn.addEventListener('click', () => location.reload());
+        
+        this.acceptRequestBtn.addEventListener('click', () => this.respondToRequest(true));
+        this.declineRequestBtn.addEventListener('click', () => this.respondToRequest(false));
+        
+        this.copyRoomBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(this.roomId);
+            alert('Room code copied: ' + this.roomId);
+        });
+        
+        this.exitRoomBtn.addEventListener('click', () => this.exitRoom());
         
         this.bindRoomEvents();
 
@@ -120,14 +164,27 @@ class App {
         this.playerSymbol = 'X';
         this.roomModal.style.display = 'none';
         
-        await firebaseService.set(firebaseService.ref(firebaseService.db, 'rooms/' + this.roomId), {
-            board: this.game.board,
-            currentPlayer: 'X',
-            status: 'waiting'
-        });
+        storage.saveRoomState({ roomId: this.roomId, playerSymbol: this.playerSymbol });
         
-        this.listenToRoom();
-        this.statusElement.innerText = `Room: ${this.roomId}. Waiting for opponent...`;
+        console.log('Room Created:', this.roomId);
+        
+        try {
+            await firebaseService.set(firebaseService.ref(firebaseService.db, 'rooms/' + this.roomId), {
+                board: this.game.board,
+                currentPlayer: 'X',
+                status: 'waiting'
+            });
+            console.log('Firebase Write Success: Room initialized');
+            
+            this.displayRoomCode.innerText = this.roomId;
+            this.roomDisplay.style.display = 'block';
+            
+            this.listenToRoom();
+            this.statusElement.innerText = `Waiting for opponent...`;
+        } catch (error) {
+            console.error('Error creating room:', error);
+            this.statusElement.innerText = "Error creating room.";
+        }
     }
 
     async joinRoom() {
@@ -137,33 +194,192 @@ class App {
         this.playerSymbol = 'O';
         this.roomModal.style.display = 'none';
         
-        this.listenToRoom();
-        this.statusElement.innerText = `Joined room ${this.roomId}`;
+        storage.saveRoomState({ roomId: this.roomId, playerSymbol: this.playerSymbol });
+        
+        console.log('Attempting to join room:', this.roomId);
+        
+        try {
+            // Update room status to playing
+            await firebaseService.update(firebaseService.ref(firebaseService.db, 'rooms/' + this.roomId), {
+                status: 'playing'
+            });
+            console.log('Firebase Write Success: Room updated to playing');
+            
+            this.listenToRoom();
+            this.statusElement.innerText = `Joined room ${this.roomId}`;
+            console.log('Room Joined:', this.roomId);
+        } catch (error) {
+            console.error('Error joining room:', error);
+            this.statusElement.innerText = "Error joining room.";
+        }
+    }
+
+    exitRoom() {
+        if (!confirm('Are you sure you want to leave the room?')) return;
+        
+        storage.clearRoomState();
+        location.reload();
+    }
+
+    handleAction(action) {
+        if (this.mode === 'online' && this.roomId) {
+            const requestData = {
+                type: action,
+                sender: this.playerSymbol,
+                status: 'pending'
+            };
+            firebaseService.update(firebaseService.ref(firebaseService.db, 'rooms/' + this.roomId), {
+                pendingRequest: requestData
+            });
+            this.statusElement.innerText = "Request sent. Waiting...";
+        } else {
+            this.restartGame();
+        }
+    }
+
+    respondToRequest(accepted) {
+        if (this.mode === 'online' && this.roomId) {
+            if (accepted) {
+                const resetData = {
+                    board: Array(9).fill(""),
+                    currentPlayer: 'X',
+                    status: 'playing',
+                    winner: null,
+                    winningPattern: null,
+                    rematchX: null,
+                    rematchO: null,
+                    pendingRequest: null
+                };
+                firebaseService.update(firebaseService.ref(firebaseService.db, 'rooms/' + this.roomId), resetData);
+            } else {
+                firebaseService.update(firebaseService.ref(firebaseService.db, 'rooms/' + this.roomId), {
+                    pendingRequest: null
+                });
+            }
+        } else {
+            if (accepted) {
+                this.restartGame();
+            }
+        }
+        this.requestModal.style.display = 'none';
+    }
+
+    requestRematch() {
+        if (!this.roomId) return;
+        const rematchField = this.playerSymbol === 'X' ? 'rematchX' : 'rematchO';
+        firebaseService.update(firebaseService.ref(firebaseService.db, 'rooms/' + this.roomId), {
+            [rematchField]: true
+        });
+        this.playAgainBtn.innerText = "Waiting for opponent...";
+        this.playAgainBtn.disabled = true;
     }
 
     listenToRoom() {
-        firebaseService.onValue(firebaseService.ref(firebaseService.db, 'rooms/' + this.roomId), (snapshot) => {
+        const roomRef = firebaseService.ref(firebaseService.db, 'rooms/' + this.roomId);
+        
+        // Handle disconnect: update status to disconnected
+        firebaseService.onDisconnect(roomRef).update({ 
+            [this.playerSymbol === 'X' ? 'playerXOnline' : 'playerOOnline']: false,
+            disconnectedAt: firebaseService.serverTimestamp()
+        });
+        
+        // Mark current player as online
+        firebaseService.update(roomRef, { 
+            [this.playerSymbol === 'X' ? 'playerXOnline' : 'playerOOnline']: true 
+        });
+
+        firebaseService.onValue(roomRef, (snapshot) => {
             const data = snapshot.val();
             if (!data) return;
             
+            // Opponent disconnect handling
+            const opponentOnline = this.playerSymbol === 'X' ? data.playerOOnline : data.playerXOnline;
+            
+            if (opponentOnline === false) {
+                this.statusElement.innerText = "Opponent Offline";
+                this.disconnectModal.style.display = 'flex';
+                // Start 60s timer
+                if (!this.disconnectTimer) {
+                    this.disconnectTimer = setTimeout(() => this.handleAbandonment(), 60000);
+                }
+            } else {
+                this.statusElement.innerText = this.game.currentPlayer === this.playerSymbol ? "Your Turn" : "Opponent's Turn";
+                this.disconnectModal.style.display = 'none';
+                clearTimeout(this.disconnectTimer);
+                this.disconnectTimer = null;
+            }
+
+            // Rematch Synchronization: If both players clicked Rematch, automatically start a new match.
+            if (this.mode === 'online' && data.rematchX && data.rematchO) {
+                if (this.playerSymbol === 'X') {
+                    const resetData = {
+                        board: Array(9).fill(""),
+                        currentPlayer: 'X',
+                        status: 'playing',
+                        winner: null,
+                        winningPattern: null,
+                        rematchX: null,
+                        rematchO: null,
+                        pendingRequest: null
+                    };
+                    firebaseService.update(roomRef, resetData);
+                }
+            }
+
+            // Request Handling
+            if (data.pendingRequest && data.pendingRequest.sender !== this.playerSymbol) {
+                this.pendingRequest = data.pendingRequest;
+                if (this.pendingRequest.type === 'newGame') {
+                    this.requestText.innerText = `Player ${this.pendingRequest.sender} wants to start a new game.`;
+                } else {
+                    this.requestText.innerText = `Player ${this.pendingRequest.sender} wants to ${this.pendingRequest.type} the match.`;
+                }
+                this.requestModal.style.display = 'flex';
+            } else {
+                this.requestModal.style.display = 'none';
+            }
+
             this.game.board = data.board;
             this.game.currentPlayer = data.currentPlayer;
             this.game.gameActive = data.status === 'playing';
             
             this.updateBoardUI();
             
-            if (data.status === 'waiting') {
-                this.statusElement.innerText = `Room: ${this.roomId}. Waiting for opponent...`;
-            } else if (data.status === 'playing') {
-                this.statusElement.innerText = this.game.currentPlayer === this.playerSymbol ? "Your Turn" : "Opponent's Turn";
+            if (data.status === 'playing') {
+                // Clear any leftover result state & hide result overlay
+                this.resultOverlay.style.display = 'none';
+                const board = document.getElementById('board');
+                if (board) {
+                    board.className = 'game-board';
+                }
+                this.playAgainBtn.innerText = this.mode === 'online' ? "Rematch" : "Play Again";
+                this.playAgainBtn.disabled = false;
             }
-            
+
             if (data.winner) {
                 this.processResult({ status: 'win', winner: data.winner, pattern: data.winningPattern || [] });
             } else if (data.status === 'draw') {
                 this.processResult({ status: 'draw' });
             }
+
+            // Keep Rematch Button State perfectly synchronized with database
+            if (this.mode === 'online' && (data.status === 'finished' || data.status === 'draw')) {
+                const myRematch = this.playerSymbol === 'X' ? data.rematchX : data.rematchO;
+                if (myRematch) {
+                    this.playAgainBtn.innerText = "Waiting for opponent...";
+                    this.playAgainBtn.disabled = true;
+                } else {
+                    this.playAgainBtn.innerText = "Rematch";
+                    this.playAgainBtn.disabled = false;
+                }
+            }
         });
+    }
+
+    handleAbandonment() {
+        firebaseService.update(firebaseService.ref(firebaseService.db, 'rooms/' + this.roomId), { status: 'abandoned' });
+        this.statusElement.innerText = "Match Abandoned";
+        document.getElementById('disconnect-msg').innerText = "Opponent did not reconnect.";
     }
 
     updateBoardUI() {
@@ -178,12 +394,13 @@ class App {
         const index = e.target.dataset.index;
         if (!this.game.gameActive || this.game.board[index] !== "") return;
 
-        // Turn Lock: Only allow move if it's player's turn in single mode
+        // Turn Lock: Only allow move if it's player's turn in single or online mode
         if (this.mode === 'single' && this.game.currentPlayer !== 'X') return;
+        if (this.mode === 'online' && this.game.currentPlayer !== this.playerSymbol) return;
 
         // Player Move
         this.makeMove(index);
-//test
+        
         if (this.game.gameActive) { 
             if (this.mode === 'single') {
                 this.statusElement.innerText = "AI Thinking...";
@@ -205,6 +422,23 @@ class App {
             cell.classList.add('haptic-tap');
             
             const result = this.game.checkResult();
+            
+            if (this.mode === 'online') {
+                const updateData = {
+                    board: this.game.board,
+                    currentPlayer: this.game.currentPlayer === 'X' ? 'O' : 'X',
+                    status: 'playing'
+                };
+                if (result.status === 'win') {
+                    updateData.winner = result.winner;
+                    updateData.winningPattern = result.pattern;
+                    updateData.status = 'finished';
+                } else if (result.status === 'draw') {
+                    updateData.status = 'draw';
+                }
+                
+                firebaseService.update(firebaseService.ref(firebaseService.db, 'rooms/' + this.roomId), updateData);
+            }
             
             if (result.status === 'win') {
                 // High-energy feedback for the winning move itself
@@ -264,11 +498,17 @@ class App {
             
             if (this.mode === 'single') {
                 storage.updateGameResult(winner === 'X' ? 'win' : 'loss', this.difficulty);
+                this.showResult(winner === 'X' ? 'You Win!' : 'CPU Wins!');
+            } else if (this.mode === 'online') {
+                // For online, both players update their local stats based on THEIR perspective
+                const amIWinner = winner === this.playerSymbol;
+                storage.updateGameResult(amIWinner ? (this.playerSymbol === 'X' ? 'winX' : 'winO') : (this.playerSymbol === 'X' ? 'winO' : 'winX'), this.difficulty, true);
+                this.showResult(amIWinner ? 'You Win!' : 'You Lose!');
             } else {
                 storage.updateGameResult(winner === 'X' ? 'winX' : 'winO', this.difficulty, true);
+                this.showResult(`Player ${winner} Wins!`);
             }
             this.updateScoreboard();
-            this.showResult(this.mode === 'multi' ? `Player ${winner} Wins!` : (winner === 'X' ? 'You Win!' : 'CPU Wins!'));
         } else if (result.status === 'draw') {
             // Shake the board for visual "no" response
             const board = document.getElementById('board');
@@ -296,20 +536,29 @@ class App {
 
     updateScoreboard() {
         const stats = storage.getStats();
+        // Ensure stats and multiStats exist to prevent crashes
+        const safeStats = stats || {};
+        const multiStats = safeStats.multiStats || { winsX: 0, winsO: 0, draws: 0 };
+
         if (this.mode === 'single') {
-            this.scoreX.innerText = stats.wins;
-            this.scoreO.innerText = stats.losses;
-            this.scoreDraw.innerText = stats.draws;
+            this.scoreX.innerText = safeStats.wins || 0;
+            this.scoreO.innerText = safeStats.losses || 0;
+            this.scoreDraw.innerText = safeStats.draws || 0;
         } else {
-            this.scoreX.innerText = stats.multiStats.winsX;
-            this.scoreO.innerText = stats.multiStats.winsO;
-            this.scoreDraw.innerText = stats.multiStats.draws;
+            this.scoreX.innerText = multiStats.winsX || 0;
+            this.scoreO.innerText = multiStats.winsO || 0;
+            this.scoreDraw.innerText = multiStats.draws || 0;
         }
     }
 
     showResult(text) {
         this.resultText.innerText = text;
         this.statusElement.innerText = "Game Over";
+        if (this.mode === 'online') {
+            this.playAgainBtn.innerText = "Rematch";
+        } else {
+            this.playAgainBtn.innerText = "Play Again";
+        }
         setTimeout(() => this.resultOverlay.style.display = 'flex', 300);
     }
 
