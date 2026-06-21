@@ -36,6 +36,7 @@
                 <select id="mode-select">
                     <option value="single">Single Player</option>
                     <option value="multi">Two Players</option>
+                    <option value="online">Online Multiplayer</option>
                 </select>
             </div>
             <div class="control-group" id="diff-group">
@@ -114,6 +115,21 @@
                 <div class="difficulty-stats">
                     <h3>AI Difficulty Performance</h3>
                     <div id="diff-stats-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Room Modal -->
+        <div id="room-modal" class="modal">
+            <div class="modal-content glass">
+                <div class="modal-header">
+                    <h2>Online Room</h2>
+                </div>
+                <div class="room-actions">
+                    <button id="create-room-btn" class="action-btn primary">Create Room</button>
+                    <div class="divider">or</div>
+                    <input type="text" id="room-code-input" placeholder="Enter Room Code">
+                    <button id="join-room-btn" class="action-btn secondary">Join Room</button>
                 </div>
             </div>
         </div>

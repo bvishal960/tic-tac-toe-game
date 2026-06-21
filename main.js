@@ -1,6 +1,7 @@
 import { Game } from './game.js';
 import { ai } from './ai.js';
 import { storage } from './storage.js';
+import { firebaseService } from './firebase-service.js';
 
 class App {
     constructor() {
@@ -9,6 +10,8 @@ class App {
         this.difficulty = storage.getSettings().difficulty;
         this.isSoundOn = storage.getSettings().sound;
         this.audioCtx = null;
+        this.roomId = null;
+        this.playerSymbol = null;
         this.initDOM();
         this.bindEvents();
         this.applySettings();
@@ -32,6 +35,10 @@ class App {
         this.soundToggle = document.getElementById('sound-toggle');
         this.statsBtn = document.getElementById('stats-btn');
         this.statsModal = document.getElementById('stats-modal');
+        this.roomModal = document.getElementById('room-modal');
+        this.roomCodeInput = document.getElementById('room-code-input');
+        this.createRoomBtn = document.getElementById('create-room-btn');
+        this.joinRoomBtn = document.getElementById('join-room-btn');
         this.closeModal = document.querySelector('.close-modal');
         this.resultOverlay = document.getElementById('result-overlay');
         this.resultText = document.getElementById('result-text');
@@ -64,6 +71,8 @@ class App {
         this.soundToggle.addEventListener('click', () => this.toggleSound());
         this.statsBtn.addEventListener('click', () => this.openStats());
         this.closeModal.addEventListener('click', () => this.statsModal.style.display = 'none');
+        
+        this.bindRoomEvents();
 
         window.addEventListener('click', (e) => {
             if (e.target === this.statsModal) this.statsModal.style.display = 'none';
@@ -85,11 +94,84 @@ class App {
         if (this.mode === 'multi') {
             this.scoreOLabel.innerText = 'Player O';
             this.diffGroup.style.display = 'none';
+        } else if (this.mode === 'online') {
+            this.scoreOLabel.innerText = 'Opponent';
+            this.diffGroup.style.display = 'none';
+            this.openRoomModal();
         } else {
             this.scoreOLabel.innerText = 'CPU';
             this.diffGroup.style.display = 'block';
         }
         this.updateScoreboard();
+    }
+
+    openRoomModal() {
+        this.roomModal.style.display = 'flex';
+    }
+
+    bindRoomEvents() {
+        this.createRoomBtn.addEventListener('click', () => this.createRoom());
+        this.joinRoomBtn.addEventListener('click', () => this.joinRoom());
+    }
+
+    async createRoom() {
+        const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+        this.roomId = roomCode;
+        this.playerSymbol = 'X';
+        this.roomModal.style.display = 'none';
+        
+        await firebaseService.set(firebaseService.ref(firebaseService.db, 'rooms/' + this.roomId), {
+            board: this.game.board,
+            currentPlayer: 'X',
+            status: 'waiting'
+        });
+        
+        this.listenToRoom();
+        this.statusElement.innerText = `Room: ${this.roomId}. Waiting for opponent...`;
+    }
+
+    async joinRoom() {
+        const roomCode = this.roomCodeInput.value.toUpperCase();
+        if (!roomCode) return;
+        this.roomId = roomCode;
+        this.playerSymbol = 'O';
+        this.roomModal.style.display = 'none';
+        
+        this.listenToRoom();
+        this.statusElement.innerText = `Joined room ${this.roomId}`;
+    }
+
+    listenToRoom() {
+        firebaseService.onValue(firebaseService.ref(firebaseService.db, 'rooms/' + this.roomId), (snapshot) => {
+            const data = snapshot.val();
+            if (!data) return;
+            
+            this.game.board = data.board;
+            this.game.currentPlayer = data.currentPlayer;
+            this.game.gameActive = data.status === 'playing';
+            
+            this.updateBoardUI();
+            
+            if (data.status === 'waiting') {
+                this.statusElement.innerText = `Room: ${this.roomId}. Waiting for opponent...`;
+            } else if (data.status === 'playing') {
+                this.statusElement.innerText = this.game.currentPlayer === this.playerSymbol ? "Your Turn" : "Opponent's Turn";
+            }
+            
+            if (data.winner) {
+                this.processResult({ status: 'win', winner: data.winner, pattern: data.winningPattern || [] });
+            } else if (data.status === 'draw') {
+                this.processResult({ status: 'draw' });
+            }
+        });
+    }
+
+    updateBoardUI() {
+        this.game.board.forEach((val, index) => {
+            const cell = this.cells[index];
+            cell.innerText = val;
+            cell.className = 'cell' + (val ? ' ' + val.toLowerCase() : '');
+        });
     }
 
     handleCellClick(e) {

@@ -332,6 +332,23 @@ select {
 .secondary { background: var(--card-bg); border: 1px solid var(--glass-border); color: var(--text-main); }
 .danger { background: transparent; border: 1px solid var(--accent-x); color: var(--accent-x); }
 
+.room-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+}
+.room-actions input {
+    width: 100%;
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid var(--glass-border);
+    background: var(--card-bg);
+    color: var(--text-main);
+    text-align: center;
+}
+.divider { font-size: 0.8rem; color: var(--text-dim); }
+
 /* Modals & Overlays */
 .modal, .overlay {
     display: none;
