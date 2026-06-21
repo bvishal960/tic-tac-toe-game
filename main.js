@@ -118,9 +118,27 @@ class App {
             const cell = this.cells[index];
             cell.innerText = player;
             cell.classList.add(player.toLowerCase());
-            this.playSound('click');
-            this.vibrate(10);
-            this.processResult();
+            
+            // Apply haptic touch depression micro-animation
+            cell.classList.add('haptic-tap');
+            
+            const result = this.game.checkResult();
+            
+            if (result.status === 'win') {
+                // High-energy feedback for the winning move itself
+                cell.classList.add('winning-move');
+                this.vibrate([15, 30, 20]);
+                this.playSound('win-move');
+            } else if (result.status === 'draw') {
+                // Feedback for draw move
+                this.vibrate([35, 60, 35]);
+            } else {
+                // Crisp click haptic for standard tap
+                this.vibrate(12);
+                this.playSound('click');
+            }
+
+            this.processResult(result);
             
             if (this.game.gameActive) {
                 this.game.switchPlayer();
@@ -139,12 +157,28 @@ class App {
         }
     }
 
-    processResult() {
-        const result = this.game.checkResult();
+    processResult(result) {
+        if (!result) result = this.game.checkResult();
+        
         if (result.status === 'win') {
             const winner = result.winner;
+            
+            // Apply winning pattern visual highlight
             result.pattern.forEach(idx => this.cells[idx].classList.add('winner'));
+            
+            // Add board-level win pulse animation
+            const board = document.getElementById('board');
+            if (board) {
+                board.classList.add('win-pulse');
+            }
+            
+            // Play luxurious celebratory arpeggio sound
             this.playSound('win');
+            
+            // Celebratory game-win rhythmic haptic sequence
+            setTimeout(() => {
+                this.vibrate([25, 40, 25, 40, 50, 40, 70]);
+            }, 100);
             
             if (this.mode === 'single') {
                 storage.updateGameResult(winner === 'X' ? 'win' : 'loss', this.difficulty);
@@ -154,6 +188,24 @@ class App {
             this.updateScoreboard();
             this.showResult(this.mode === 'multi' ? `Player ${winner} Wins!` : (winner === 'X' ? 'You Win!' : 'CPU Wins!'));
         } else if (result.status === 'draw') {
+            // Shake the board for visual "no" response
+            const board = document.getElementById('board');
+            if (board) {
+                board.classList.add('draw-shake');
+            }
+            
+            // Elegant fade for draw state
+            this.cells.forEach(c => {
+                if (c.innerText === "") {
+                    c.classList.add('draw-empty-fade');
+                } else {
+                    c.classList.add('draw-fade');
+                }
+            });
+            
+            // Play descending soft sigh sound
+            this.playSound('draw');
+            
             storage.updateGameResult('draw', this.difficulty, this.mode === 'multi');
             this.updateScoreboard();
             this.showResult("It's a Draw!");
@@ -181,6 +233,13 @@ class App {
 
     restartGame() {
         this.game.reset();
+        
+        // Remove board-level animation classes
+        const board = document.getElementById('board');
+        if (board) {
+            board.className = 'game-board';
+        }
+        
         this.cells.forEach(cell => {
             cell.innerText = "";
             cell.className = 'cell';
@@ -211,24 +270,93 @@ class App {
         if (!this.isSoundOn) return;
         this.initAudio();
         try {
-            const osc = this.audioCtx.createOscillator();
-            const g = this.audioCtx.createGain();
-            osc.connect(g);
-            g.connect(this.audioCtx.destination);
+            const now = this.audioCtx.currentTime;
+            
             if (type === 'click') {
-                osc.frequency.setValueAtTime(400, this.audioCtx.currentTime);
-                g.gain.exponentialRampToValueAtTime(0.01, this.audioCtx.currentTime + 0.1);
-                osc.start(); osc.stop(this.audioCtx.currentTime + 0.1);
-            } else {
-                osc.frequency.setValueAtTime(500, this.audioCtx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(800, this.audioCtx.currentTime + 0.3);
-                g.gain.exponentialRampToValueAtTime(0.01, this.audioCtx.currentTime + 0.3);
-                osc.start(); osc.stop(this.audioCtx.currentTime + 0.3);
+                const osc = this.audioCtx.createOscillator();
+                const g = this.audioCtx.createGain();
+                osc.connect(g);
+                g.connect(this.audioCtx.destination);
+                
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, now);
+                osc.frequency.exponentialRampToValueAtTime(300, now + 0.08);
+                
+                g.gain.setValueAtTime(0.15, now);
+                g.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                
+                osc.start(now);
+                osc.stop(now + 0.08);
+            } 
+            else if (type === 'win-move') {
+                // A sparkling rising perfect 5th interval
+                const osc = this.audioCtx.createOscillator();
+                const g = this.audioCtx.createGain();
+                osc.connect(g);
+                g.connect(this.audioCtx.destination);
+                
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(523.25, now); // C5
+                osc.frequency.exponentialRampToValueAtTime(783.99, now + 0.15); // G5
+                
+                g.gain.setValueAtTime(0.1, now);
+                g.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                
+                osc.start(now);
+                osc.stop(now + 0.15);
             }
-        } catch(e) {}
+            else if (type === 'win') {
+                // Rhythmic major chord arpeggio (C5 - E5 - G5 - C6)
+                const notes = [523.25, 659.25, 783.99, 1046.50];
+                notes.forEach((freq, index) => {
+                    const osc = this.audioCtx.createOscillator();
+                    const g = this.audioCtx.createGain();
+                    osc.connect(g);
+                    g.connect(this.audioCtx.destination);
+                    
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, now + index * 0.08);
+                    
+                    g.gain.setValueAtTime(0, now + index * 0.08);
+                    g.gain.linearRampToValueAtTime(0.15, now + index * 0.08 + 0.02);
+                    g.gain.exponentialRampToValueAtTime(0.01, now + index * 0.08 + 0.3);
+                    
+                    osc.start(now + index * 0.08);
+                    osc.stop(now + index * 0.08 + 0.3);
+                });
+            } 
+            else if (type === 'draw') {
+                // A descending soft "sigh"
+                const osc = this.audioCtx.createOscillator();
+                const g = this.audioCtx.createGain();
+                osc.connect(g);
+                g.connect(this.audioCtx.destination);
+                
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(350, now);
+                osc.frequency.linearRampToValueAtTime(180, now + 0.35);
+                
+                g.gain.setValueAtTime(0.12, now);
+                g.gain.linearRampToValueAtTime(0.04, now + 0.15);
+                g.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+                
+                osc.start(now);
+                osc.stop(now + 0.35);
+            }
+        } catch(e) {
+            console.warn('Audio feedback failed:', e);
+        }
     }
 
-    vibrate(ms) { if (navigator.vibrate) navigator.vibrate(ms); }
+    vibrate(pattern) {
+        if (navigator.vibrate) {
+            try {
+                navigator.vibrate(pattern);
+            } catch (e) {
+                // Graceful degradation for unsupported/sandboxed contexts
+            }
+        }
+    }
 
     resetStats() {
         if (confirm('Reset all statistics?')) {

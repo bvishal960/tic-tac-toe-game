@@ -8,6 +8,11 @@ const defaultStats = {
     currentStreak: 0,
     bestStreak: 0,
     lastPlayed: null,
+    multiStats: {
+        winsX: 0,
+        winsO: 0,
+        draws: 0
+    },
     difficultyStats: {
         easy: { wins: 0, losses: 0, draws: 0 },
         medium: { wins: 0, losses: 0, draws: 0 },
